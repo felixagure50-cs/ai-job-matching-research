@@ -1,8 +1,8 @@
+import subprocess
+import sys
 import streamlit as st
 import pandas as pd
 import re
-import subprocess
-import sys
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -12,30 +12,20 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Function to download spaCy model if not available
+# Function to load spaCy model
 @st.cache_resource
 def load_spacy_model():
     try:
         import spacy
-        # Try to load the model
-        nlp = spacy.load("en_core_web_sm")
-        st.success("✅ spaCy model loaded successfully!")
-        return nlp
+        return spacy.load("en_core_web_sm")
     except:
         st.info("Downloading spaCy language model (this happens once)...")
-        # Download the model
         subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
         import spacy
-        nlp = spacy.load("en_core_web_sm")
-        st.success("✅ spaCy model downloaded and loaded!")
-        return nlp
+        return spacy.load("en_core_web_sm")
 
 # Load spaCy model
-try:
-    nlp = load_spacy_model()
-except Exception as e:
-    st.error(f"Error loading spaCy: {e}")
-    st.stop()
+nlp = load_spacy_model()
 
 # Load data
 @st.cache_data
@@ -61,6 +51,7 @@ def process_data(df, _nlp):
     progress_bar = st.progress(0)
     st.write("Processing resumes...")
     
+    # Use Resume_str column
     df['cleaned'] = df['Resume_str'].apply(clean_text)
     progress_bar.progress(30)
     
@@ -81,6 +72,7 @@ def process_data(df, _nlp):
 with st.spinner("Loading system..."):
     df = load_data()
     st.write(f"✅ Dataset loaded: {len(df)} resumes")
+    st.write(f"Columns found: {list(df.columns)}")
     df, vectorizer, vectors, matrix = process_data(df, nlp)
 
 st.success("✅ System ready!")
@@ -158,12 +150,13 @@ with tab3:
     category_counts = df['Category'].value_counts()
     st.bar_chart(category_counts)
     
-    selected_category = st.selectbox("Select a category:", df['Category'].unique())
+    selected_category = st.selectbox("Select a category to view samples:", df['Category'].unique())
     
     samples = df[df['Category'] == selected_category].head(3)
     for i, row in samples.iterrows():
         with st.expander(f"Sample {i}"):
             st.write(row['processed'][:500] + "...")
 
+# Footer
 st.markdown("---")
 st.markdown("Built with Python, scikit-learn, spaCy, and Streamlit")
