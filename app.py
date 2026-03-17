@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import re
-import spacy
+import subprocess
+import sys
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -11,18 +12,37 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Load data and model (cached for speed)
+# Function to download spaCy model if not available
+@st.cache_resource
+def load_spacy_model():
+    try:
+        import spacy
+        # Try to load the model
+        nlp = spacy.load("en_core_web_sm")
+        st.success("✅ spaCy model loaded successfully!")
+        return nlp
+    except:
+        st.info("Downloading spaCy language model (this happens once)...")
+        # Download the model
+        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+        import spacy
+        nlp = spacy.load("en_core_web_sm")
+        st.success("✅ spaCy model downloaded and loaded!")
+        return nlp
+
+# Load spaCy model
+try:
+    nlp = load_spacy_model()
+except Exception as e:
+    st.error(f"Error loading spaCy: {e}")
+    st.stop()
+
+# Load data
 @st.cache_data
 def load_data():
     df = pd.read_csv('Resume.csv')
     return df
 
-# FIXED: Added underscore to nlp parameter
-@st.cache_resource
-def load_nlp():
-    return spacy.load('en_core_web_sm')
-
-# FIXED: Added underscore to nlp parameter
 @st.cache_data
 def process_data(df, _nlp):
     def clean_text(text):
@@ -38,14 +58,10 @@ def process_data(df, _nlp):
         words = [token.lemma_ for token in doc if not token.is_stop]
         return ' '.join(words)
     
-    # Create progress bar
     progress_bar = st.progress(0)
     st.write("Processing resumes...")
     
-    # IMPORTANT: Change 'Resume_str' to your actual column name
-    text_column = 'Resume_str'  # CHANGE THIS if needed
-    
-    df['cleaned'] = df[text_column].apply(clean_text)
+    df['cleaned'] = df['Resume_str'].apply(clean_text)
     progress_bar.progress(30)
     
     df['processed'] = df['cleaned'].apply(lemmatize_text)
@@ -61,14 +77,10 @@ def process_data(df, _nlp):
     st.success("✅ Processing complete!")
     return df, vectorizer, vectors, matrix
 
-# Load everything with progress indicators
-with st.spinner("Loading system... This takes a moment"):
+# Load everything
+with st.spinner("Loading system..."):
     df = load_data()
-    
-    # Show column names to help debugging
-    st.write("Dataset columns:", list(df.columns))
-    
-    nlp = load_nlp()
+    st.write(f"✅ Dataset loaded: {len(df)} resumes")
     df, vectorizer, vectors, matrix = process_data(df, nlp)
 
 st.success("✅ System ready!")
@@ -77,21 +89,16 @@ st.success("✅ System ready!")
 with st.sidebar:
     st.header("📊 Dataset Info")
     st.write(f"Total Resumes: {len(df)}")
-    
-    # Find category column (might be 'Category' or something else)
-    cat_col = 'Category' if 'Category' in df.columns else df.columns[-1]
-    st.write(f"Job Categories: {df[cat_col].nunique()}")
-    
+    st.write(f"Job Categories: {df['Category'].nunique()}")
     st.write("\n📌 How it works:")
     st.write("1. Text is cleaned and processed")
     st.write("2. Converted to numbers using TF-IDF")
     st.write("3. Similarity calculated using cosine")
-    st.write("4. Top matches are displayed")
 
 # Main app tabs
 tab1, tab2, tab3 = st.tabs(["🎯 Find Similar Resumes", "📝 Match New Resume", "📊 Explore Categories"])
 
-# Tab 1: Find similar resumes from dataset
+# Tab 1: Find similar resumes
 with tab1:
     st.header("Find Resumes Similar to an Existing One")
     
@@ -105,8 +112,7 @@ with tab1:
         col1, col2 = st.columns([1, 1])
         with col1:
             st.subheader("Selected Resume")
-            cat_col = 'Category' if 'Category' in df.columns else df.columns[-1]
-            st.write(f"**Category:** {df.iloc[resume_index][cat_col]}")
+            st.write(f"**Category:** {df.iloc[resume_index]['Category']}")
             st.write("**Preview:**")
             st.write(df.iloc[resume_index]['processed'][:300] + "...")
         
@@ -115,7 +121,7 @@ with tab1:
             for idx in similar:
                 score = scores[idx]
                 st.write(f"**Match: {score:.1%}**")
-                st.write(f"Category: {df.iloc[idx][cat_col]}")
+                st.write(f"Category: {df.iloc[idx]['Category']}")
                 st.write(f"Preview: {df.iloc[idx]['processed'][:150]}...")
                 st.divider()
 
@@ -127,25 +133,21 @@ with tab2:
     
     if st.button("Find Matches", key="btn2") and user_text:
         with st.spinner("Processing..."):
-            # Process user input
             cleaned = re.sub(r'[^a-zA-Z\s]', '', user_text.lower())
             doc = nlp(cleaned)
             processed = ' '.join([token.lemma_ for token in doc if not token.is_stop])
             
-            # Vectorize and compare
             user_vector = vectorizer.transform([processed])
             similarities = cosine_similarity(user_vector, vectors).flatten()
             top_indices = np.argsort(similarities)[-10:][::-1]
             
-            st.subheader("Top 10 Matching Resumes in Database")
-            cat_col = 'Category' if 'Category' in df.columns else df.columns[-1]
-            
+            st.subheader("Top 10 Matching Resumes")
             cols = st.columns(2)
             for i, idx in enumerate(top_indices):
                 with cols[i % 2]:
                     score = similarities[idx]
                     st.write(f"**Match: {score:.1%}**")
-                    st.write(f"Category: {df.iloc[idx][cat_col]}")
+                    st.write(f"Category: {df.iloc[idx]['Category']}")
                     st.write(f"Preview: {df.iloc[idx]['processed'][:200]}...")
                     st.divider()
 
@@ -153,18 +155,15 @@ with tab2:
 with tab3:
     st.header("Explore Job Categories")
     
-    cat_col = 'Category' if 'Category' in df.columns else df.columns[-1]
-    category_counts = df[cat_col].value_counts()
+    category_counts = df['Category'].value_counts()
     st.bar_chart(category_counts)
     
-    selected_category = st.selectbox("Select a category to view samples:", 
-                                     df[cat_col].unique())
+    selected_category = st.selectbox("Select a category:", df['Category'].unique())
     
-    samples = df[df[cat_col] == selected_category].head(3)
+    samples = df[df['Category'] == selected_category].head(3)
     for i, row in samples.iterrows():
-        with st.expander(f"Sample {i} - {selected_category}"):
+        with st.expander(f"Sample {i}"):
             st.write(row['processed'][:500] + "...")
 
-# Footer
 st.markdown("---")
 st.markdown("Built with Python, scikit-learn, spaCy, and Streamlit")
