@@ -1,4 +1,6 @@
+import subprocess
 import sys
+subprocess.run([sys.executable, "-m", "pip", "install", "setuptools"])
 import streamlit as st
 import pandas as pd
 import re
