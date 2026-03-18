@@ -12,26 +12,44 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Function to load spaCy model
+# Check Python version
+st.write(f"Python version: {sys.version}")
+
+# Function to load spaCy model with better error handling
 @st.cache_resource
 def load_spacy_model():
     try:
         import spacy
-        return spacy.load("en_core_web_sm")
-    except:
-        st.info("Downloading spaCy language model (this happens once)...")
-        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-        import spacy
-        return spacy.load("en_core_web_sm")
+        st.write("✅ spaCy imported successfully")
+        try:
+            nlp = spacy.load("en_core_web_sm")
+            st.write("✅ Model loaded successfully")
+            return nlp
+        except OSError:
+            st.write("Downloading spaCy model...")
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
+            import spacy
+            return spacy.load("en_core_web_sm")
+    except Exception as e:
+        st.error(f"Error loading spaCy: {str(e)}")
+        st.stop()
 
 # Load spaCy model
-nlp = load_spacy_model()
+try:
+    nlp = load_spacy_model()
+except Exception as e:
+    st.error(f"Failed to load NLP model: {e}")
+    st.stop()
 
 # Load data
 @st.cache_data
 def load_data():
-    df = pd.read_csv('Resume.csv')
-    return df
+    try:
+        df = pd.read_csv('Resume.csv')
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        st.stop()
 
 @st.cache_data
 def process_data(df, _nlp):
@@ -44,36 +62,45 @@ def process_data(df, _nlp):
         return text
     
     def lemmatize_text(text):
-        doc = _nlp(text)
-        words = [token.lemma_ for token in doc if not token.is_stop]
-        return ' '.join(words)
+        try:
+            doc = _nlp(text)
+            words = [token.lemma_ for token in doc if not token.is_stop]
+            return ' '.join(words)
+        except Exception as e:
+            st.warning(f"Error processing text: {e}")
+            return text
     
     progress_bar = st.progress(0)
-    st.write("Processing resumes...")
+    status_text = st.empty()
     
-    # Use Resume_str column
+    status_text.text("Cleaning text...")
     df['cleaned'] = df['Resume_str'].apply(clean_text)
     progress_bar.progress(30)
     
+    status_text.text("Lemmatizing text...")
     df['processed'] = df['cleaned'].apply(lemmatize_text)
     progress_bar.progress(60)
     
+    status_text.text("Creating vectors...")
     vectorizer = TfidfVectorizer(max_features=5000)
     vectors = vectorizer.fit_transform(df['processed'])
     progress_bar.progress(80)
     
+    status_text.text("Building similarity matrix...")
     matrix = cosine_similarity(vectors)
     progress_bar.progress(100)
     
-    st.success("✅ Processing complete!")
+    status_text.text("✅ Processing complete!")
     return df, vectorizer, vectors, matrix
 
 # Load everything
 with st.spinner("Loading system..."):
     df = load_data()
     st.write(f"✅ Dataset loaded: {len(df)} resumes")
-    st.write(f"Columns found: {list(df.columns)}")
-    df, vectorizer, vectors, matrix = process_data(df, nlp)
+    st.write(f"Columns: {list(df.columns)}")
+    
+    with st.spinner("Processing data (this takes 2-3 minutes)..."):
+        df, vectorizer, vectors, matrix = process_data(df, nlp)
 
 st.success("✅ System ready!")
 
