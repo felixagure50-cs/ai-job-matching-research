@@ -1,6 +1,5 @@
-import subprocess
-import sys
 import streamlit as st
+import sys
 import pandas as pd
 import re
 import numpy as np
@@ -12,44 +11,25 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Check Python version
+# Show Python version
 st.write(f"Python version: {sys.version}")
 
-# Function to load spaCy model with better error handling
-@st.cache_resource
-def load_spacy_model():
-    try:
-        import spacy
-        st.write("✅ spaCy imported successfully")
-        try:
-            nlp = spacy.load("en_core_web_sm")
-            st.write("✅ Model loaded successfully")
-            return nlp
-        except OSError:
-            st.write("Downloading spaCy model...")
-            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
-            import spacy
-            return spacy.load("en_core_web_sm")
-    except Exception as e:
-        st.error(f"Error loading spaCy: {str(e)}")
-        st.stop()
-
-# Load spaCy model
+# Try to import spacy - the model should be installed via requirements.txt
 try:
-    nlp = load_spacy_model()
+    import spacy
+    st.write("✅ spaCy imported successfully")
+    nlp = spacy.load("en_core_web_sm")
+    st.write("✅ Model loaded successfully")
 except Exception as e:
-    st.error(f"Failed to load NLP model: {e}")
+    st.error(f"Error loading spaCy: {e}")
+    st.info("The spaCy model should be installed via requirements.txt")
     st.stop()
 
 # Load data
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv('Resume.csv')
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        st.stop()
+    df = pd.read_csv('Resume.csv')
+    return df
 
 @st.cache_data
 def process_data(df, _nlp):
@@ -62,13 +42,9 @@ def process_data(df, _nlp):
         return text
     
     def lemmatize_text(text):
-        try:
-            doc = _nlp(text)
-            words = [token.lemma_ for token in doc if not token.is_stop]
-            return ' '.join(words)
-        except Exception as e:
-            st.warning(f"Error processing text: {e}")
-            return text
+        doc = _nlp(text)
+        words = [token.lemma_ for token in doc if not token.is_stop]
+        return ' '.join(words)
     
     progress_bar = st.progress(0)
     status_text = st.empty()
