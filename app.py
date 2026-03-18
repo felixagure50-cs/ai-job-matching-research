@@ -11,20 +11,29 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Show Python version for debugging
+# Show Python version
 st.write(f"Python version: {sys.version}")
 
-# Load spaCy model
+# Load spaCy model with better error handling
 @st.cache_resource
 def load_spacy_model():
-    import spacy
-    return spacy.load("en_core_web_sm")
+    try:
+        import spacy
+        st.write("✅ spaCy imported")
+        return spacy.load("en_core_web_sm")
+    except ImportError as e:
+        st.error(f"ImportError: {e}")
+        st.info("Try adding 'setuptools' to requirements.txt")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error: {e}")
+        st.stop()
 
 try:
     nlp = load_spacy_model()
     st.success("✅ spaCy model loaded successfully!")
 except Exception as e:
-    st.error(f"Error loading spaCy: {e}")
+    st.error(f"Failed: {e}")
     st.stop()
 
 # Load data
