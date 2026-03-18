@@ -1,5 +1,5 @@
-import streamlit as st
 import sys
+import streamlit as st
 import pandas as pd
 import re
 import numpy as np
@@ -14,15 +14,18 @@ st.write("Find matching jobs or candidates using AI")
 # Show Python version
 st.write(f"Python version: {sys.version}")
 
-# Try to import spacy - the model should be installed via requirements.txt
-try:
+# Load spaCy model
+@st.cache_resource
+def load_spacy_model():
     import spacy
-    st.write("✅ spaCy imported successfully")
-    nlp = spacy.load("en_core_web_sm")
-    st.write("✅ Model loaded successfully")
+    return spacy.load("en_core_web_sm")
+
+try:
+    nlp = load_spacy_model()
+    st.success("✅ spaCy model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading spaCy: {e}")
-    st.info("The spaCy model should be installed via requirements.txt")
+    st.info("Make sure requirements.txt has the correct versions")
     st.stop()
 
 # Load data
