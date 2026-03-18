@@ -1,6 +1,22 @@
 import subprocess
 import sys
-subprocess.run([sys.executable, "-m", "pip", "install", "setuptools"])
+
+# Force install setuptools first
+try:
+    import pkg_resources
+    print("✅ pkg_resources already available")
+except ImportError:
+    print("Installing setuptools...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "setuptools==65.5.0"])
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "wheel"])
+    # Try import again
+    try:
+        import pkg_resources
+        print("✅ pkg_resources installed successfully")
+    except ImportError as e:
+        print(f"❌ Still failed: {e}")
+
+# Now import everything else
 import streamlit as st
 import pandas as pd
 import re
@@ -16,26 +32,17 @@ st.write("Find matching jobs or candidates using AI")
 # Show Python version
 st.write(f"Python version: {sys.version}")
 
-# Load spaCy model with better error handling
+# Load spaCy model
 @st.cache_resource
 def load_spacy_model():
-    try:
-        import spacy
-        st.write("✅ spaCy imported")
-        return spacy.load("en_core_web_sm")
-    except ImportError as e:
-        st.error(f"ImportError: {e}")
-        st.info("Try adding 'setuptools' to requirements.txt")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error: {e}")
-        st.stop()
+    import spacy
+    return spacy.load("en_core_web_sm")
 
 try:
     nlp = load_spacy_model()
     st.success("✅ spaCy model loaded successfully!")
 except Exception as e:
-    st.error(f"Failed: {e}")
+    st.error(f"Error loading spaCy: {e}")
     st.stop()
 
 # Load data
