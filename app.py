@@ -11,7 +11,7 @@ st.set_page_config(page_title="AI Job Matching", layout="wide")
 st.title("🔍 AI Driven Job Matching System")
 st.write("Find matching jobs or candidates using AI")
 
-# Show Python version
+# Show Python version for debugging
 st.write(f"Python version: {sys.version}")
 
 # Load spaCy model
@@ -25,7 +25,6 @@ try:
     st.success("✅ spaCy model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading spaCy: {e}")
-    st.info("Make sure requirements.txt has the correct versions")
     st.stop()
 
 # Load data
